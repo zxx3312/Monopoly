@@ -1,0 +1,307 @@
+import pygame
+from pygame import display, event, font, image, time, mixer
+from pygame.locals import *
+from MusicPlay import MusicPlay
+from Enums import GameStatus, PlayerTurn
+import random
+
+class GameManager:
+    def __init__(self):
+        pygame.init()
+        self.clock = time.Clock()
+        self.source = "./source/"
+        self.font = font.Font(self.source + "simhei.ttf", 20)
+        self.screen = display.set_mode((800,800))
+        display.set_icon(self.__image_load("Dog.ico"))
+        display.set_caption("环保作物种植")
+        self.music = mixer.music.load(self.source + "BackgroundMusic.mp3")
+        self.backgroundMusic = MusicPlay(self.music)
+
+        self.initialToPlaying = False
+        self.gameStatus = GameStatus.start
+        self.playerTurn = PlayerTurn.start
+        self.cheat = [0, 0, 0]
+        self.spaceKeyDown = event.Event(KEYDOWN, key=K_SPACE)
+        self.PCActKey = [0, 0, 0, 0]  # K_b, K_p, K_u, K_f
+        self.winner = ""
+        self.turn_count = 0
+
+        self.start = self.__image_load("Start.png")
+        self.gameFail = self.__image_load("GameFail.png")
+        self.gameWin = self.__image_load("GameWin.png")
+        self.gameMap = self.__image_load("EcoMap.png")
+        self.tips = self.__image_load("Tips.png")
+        self.musicOn = self.__image_load("MusicOn.png")
+        self.musicOff = self.__image_load("MusicOff.png")
+        self.musicImage = self.musicOn
+        self.musicBarrier = self.__image_load("MusicBarrier.png")
+        self.musicButtonLocation = (41 * 25, 27 * 25)
+        self.musicButtonRect = Rect(41 * 25, 27 * 25, 100, 75)
+        self.activeOn = self.__image_load("ActiveOn.png")
+        self.activeOff = self.__image_load("ActiveOff.png")
+
+        self.PCName = ""
+        self.PCImage = self.__image_load("PC.png")
+        self.PCFixImage = self.__image_load("PCFix.png")
+        self.PCBoard = [(5 * 25, 4 * 25 + 12), (5 * 25, 8 * 25)]
+        self.NPCName = ""
+        self.NPCImage = self.__image_load("NPC.png")
+        self.NPCFixImage = self.__image_load("NPCFix.png")
+        self.NPCBoard = [(27 * 25, 4 * 25 + 12), (27 * 25, 8 * 25)]
+
+        self.diceImages = [self.__image_load(f"Dice{j+1}.png") for j in range(6)]
+        self.diceBarrier = self.__image_load("DiceBarrier.png")
+        self.diceBoard = [(22 * 25, 18 * 25 + 5), (19 * 25 + 12, 18 * 25 + 5), (24 * 25 + 13, 18 * 25 + 5)]
+        self.diceLocation = [self.diceBoard[0]]
+        self.diceSteps = (0, 0, True)
+
+        # self.plantImages = [
+        #     [self.__image_load(f"{plant}{i}.png") for i in range(1, 4)]
+        #     for plant in ["Seaweed", "WaterGrass", "Sunflower", "Tree", "Forest"]
+        # ]
+        self.plantImages = self.__image_load("any.png")
+        # self.factoryImages = [self.__image_load(f"Factory{i}.png") for i in range(1, 4)]
+        self.factoryImages = self.__image_load("any.png")
+        self.wasteland = self.__image_load("Wasteland.png")
+        self.tips_texts = [
+            "海藻吸收二氧化碳，促进海洋碳汇！",
+            "水草为海洋生态提供氧气和栖息地。",
+            "向日葵通过光合作用减少碳排放。",
+            "森林是地球的肺，每年吸收大量碳。"
+        ]
+
+    def event_deal(self):
+        for even in event.get():
+            # print(even.type, KEYDOWN)
+            if even.type == QUIT or (even.type == KEYDOWN and even.key == K_e):
+                self.__quit()
+            if even.type == KEYDOWN:
+                if even.key == K_r:
+                    self.__play_again()
+                elif even.key == K_SPACE and self.gameStatus == GameStatus.waitIn:
+                    self.gameStatus = GameStatus.initial
+                    self.spaceKeyDown = even
+                elif even.key == K_SPACE and self.gameStatus == GameStatus.playing:
+                    self.turn_change_space()
+                elif self.gameStatus == GameStatus.playing and not self.__developer_pattern_check():
+                    self.__set_developer_pattern(even.key)
+                self.__set_PC_act_key(even)
+            if even.type == MOUSEBUTTONDOWN and even.button == BUTTON_LEFT:
+                self.__music_pause(even.pos)
+
+    def post_space_key_down(self):
+        event.post(self.spaceKeyDown)
+
+    def get_character_name(self, PC_name, NPC_name):
+        self.PCName = PC_name
+        self.NPCName = NPC_name
+
+    @staticmethod
+    def image_update():
+        display.update()
+
+    def __image_load(self, name):
+        try:
+            img = image.load(self.source + name).convert_alpha()
+            if name == "EcoMap.png":
+                img = pygame.transform.scale(img, (800, 800))
+            # print(f"Loaded {name}: {img.get_size()}")
+            return img
+        except pygame.error:
+            # print(f"Error loading image: {self.source + name}")
+            return image.load(self.source + "Wasteland.png").convert_alpha()
+    
+    def draw_beginning(self):
+        for j in range(150):
+            self.clock.tick(300)
+            self.screen.blit(self.gameMap, (0, 0))
+            self.screen.blit(self.PCFixImage, (6 * 25 + 13 + j * 1 - 10, 6 * 25 + 13 - 10))
+            self.screen.blit(self.NPCFixImage, (38 * 25 + 13 - j * 1 - 10, 6 * 25 + 13 - 10))
+            self.screen.blit(self.start, (175, 325))
+            self.screen.blit(self.musicImage, self.musicButtonLocation)
+            display.update()
+
+    def draw_map(self):
+        self.screen.blit(self.gameMap, (0, 0))
+
+    @staticmethod
+    def __location_convert(position):
+        grid_size = 72  # 调整为新格子尺寸
+        if position <= 10:
+            return position * grid_size, 0
+        if position <= 21:
+            return 10 * grid_size, (position - 11) * grid_size
+        if position <= 32:
+            return (10 - (position - 22)) * grid_size, 10 * grid_size
+        if position <= 43:
+            return 0, (10 - (position - 33)) * grid_size
+            
+    def draw_character(self, PC_pos, NPC_pos):
+        if self.playerTurn in [PlayerTurn.PCAct, PlayerTurn.NPCMove, PlayerTurn.start] or self.initialToPlaying:
+            self.screen.blit(self.NPCImage, self.__location_convert(NPC_pos))
+            self.screen.blit(self.PCImage, self.__location_convert(PC_pos))
+        else:
+            self.screen.blit(self.PCImage, self.__location_convert(PC_pos))
+            self.screen.blit(self.NPCImage, self.__location_convert(NPC_pos))
+        self.screen.blit(self.PCFixImage, (19 * 25 - 21, 4 * 25))
+        self.screen.blit(self.NPCFixImage, (41 * 25 - 21, 4 * 25))
+
+    def draw_active_status(self):
+        if self.playerTurn in [PlayerTurn.PCMove, PlayerTurn.PCAct]:
+            self.screen.blit(self.activeOn, (4 * 25, 4 * 25))
+            self.screen.blit(self.activeOn, (4 * 25, 8 * 25))
+            self.screen.blit(self.activeOff, (26 * 25, 4 * 25))
+            self.screen.blit(self.activeOff, (26 * 25, 8 * 25))
+        elif self.playerTurn in [PlayerTurn.NPCMove, PlayerTurn.NPCAct]:
+            self.screen.blit(self.activeOff, (4 * 25, 4 * 25))
+            self.screen.blit(self.activeOff, (4 * 25, 8 * 25))
+            self.screen.blit(self.activeOn, (26 * 25, 4 * 25))
+            self.screen.blit(self.activeOn, (26 * 25, 8 * 25))
+        else:
+            self.screen.blit(self.activeOff, (4 * 25, 4 * 25))
+            self.screen.blit(self.activeOff, (4 * 25, 8 * 25))
+            self.screen.blit(self.activeOff, (26 * 25, 4 * 25))
+            self.screen.blit(self.activeOff, (26 * 25, 8 * 25))
+
+    def draw_lands(self, all_lands):
+        for land in all_lands:
+            pos = self.__location_convert(land.position)
+            if land.owner == self.PCName and land.plant_type is not None:
+                self.screen.blit(self.plantImages[land.plant_type][land.plant_level - 1], pos)
+            elif land.owner == self.PCName and land.factory_level > 0:
+                self.screen.blit(self.factoryImages[land.factory_level - 1], pos)
+            elif land.owner == self.NPCName and land.plant_type is not None:
+                self.screen.blit(self.plantImages[land.plant_type][land.plant_level - 1], pos)
+            elif land.owner == self.NPCName and land.factory_level > 0:
+                self.screen.blit(self.factoryImages[land.factory_level - 1], pos)
+            else:
+                self.screen.blit(self.wasteland, pos)
+
+    def draw_tips(self):
+        if self.gameStatus != GameStatus.over:
+            self.screen.blit(self.tips, (3 * 25, 27 * 25))
+            tip = self.font.render(random.choice(self.tips_texts), True, (0, 255, 0))
+            self.screen.blit(tip, (3 * 25, 27 * 25 + 50))
+
+    def __developer_pattern_check(self):
+        return self.cheat[0] * self.cheat[1] * self.cheat[2] == 1
+
+    def __set_developer_pattern(self, event_key):
+        if event_key == K_d:
+            self.cheat[0] = 1
+        if self.cheat[0] == 1 and event_key == K_w:
+            self.cheat[1] = 1
+        if self.cheat[1] == 1 and event_key == K_q:
+            self.cheat[2] = 1
+
+    def __set_PC_act_key(self, event):
+        print(f"Key pressed: {event.key}")
+        if event.key == K_b:
+            self.PCActKey[0] = event.key
+        if event.key == K_p:
+            self.PCActKey[1] = event.key
+        if event.key == K_u:
+            self.PCActKey[2] = event.key
+        if event.key == K_f:
+            self.PCActKey[3] = event.key
+
+    def __music_pause(self, mouse_pos):
+        if self.backgroundMusic.pause(mouse_pos):
+            self.__draw_music_button_change(self.backgroundMusic.isPlaying)
+
+    def draw_music_button(self):
+        self.screen.blit(self.musicImage, self.musicButtonLocation)
+
+    def __draw_music_button_change(self, is_playing):
+        self.musicImage = self.musicOn if is_playing else self.musicOff
+        self.screen.blit(self.musicImage, self.musicButtonLocation)
+        display.update(self.musicButtonRect)
+        time.delay(100)
+        self.screen.blit(self.musicBarrier, self.musicButtonLocation)
+        self.screen.blit(self.musicImage, self.musicButtonLocation)
+        display.update(self.musicButtonRect)
+
+    def __set_dice_location(self):
+        self.diceLocation = [self.diceBoard[0]]
+
+    def draw_dice(self, final_points, random_series):
+        if self.diceSteps[2] is False and self.playerTurn in [PlayerTurn.PCMove, PlayerTurn.NPCMove]:
+            self.__set_dice_location()
+            self.clock.tick(5)
+            for rand in random_series[:10]:  # 缩短动画
+                self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))
+                self.screen.blit(self.diceImages[rand], self.diceLocation[0])
+                display.update()
+            self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))
+            self.screen.blit(self.diceImages[final_points[0] - 1], self.diceLocation[0])
+            display.update()
+            time.delay(700)
+
+    def draw_fix_dice(self, final_points):
+        self.screen.blit(self.diceImages[final_points[0] - 1], self.diceLocation[0])
+
+    def draw_messages(self, messages):
+        PC_messages = messages[0]
+        for j in range(len(PC_messages[0])):
+            for k in range(len(PC_messages[0][j])):
+                self.screen.blit(self.font.render(PC_messages[0][j][k], True, [0, 0, 0]), (self.PCBoard[0][0] + k * 25 * 6, self.PCBoard[0][1] + j * 25))
+        for j in range(len(PC_messages[1])):
+            self.screen.blit(self.font.render(PC_messages[1][j], True, [0, 0, 255]), (self.PCBoard[1][0], self.PCBoard[1][1] + j * 25))
+
+        NPC_messages = messages[1]
+        if self.__developer_pattern_check():
+            for j in range(len(NPC_messages[0])):
+                for k in range(len(NPC_messages[0][j])):
+                    self.screen.blit(self.font.render(NPC_messages[0][j][k], True, [0, 0, 0]), (self.NPCBoard[0][0] + k * 25 * 6, self.NPCBoard[0][1] + j * 25))
+            for j in range(len(NPC_messages[1])):
+                self.screen.blit(self.font.render(NPC_messages[1][j], True, [0, 0, 255]), (self.NPCBoard[1][0], self.NPCBoard[1][1] + j * 25))
+        else:
+            self.screen.blit(self.font.render("依次按下DWQ进入开发者模式", True, [0, 0, 255]), (27 * 25, 7 * 25))
+            self.screen.blit(self.font.render("查看NPC的状态", True, [0, 0, 255]), (27 * 25, 8 * 25))
+
+    def turn_change(self):
+        if self.playerTurn == PlayerTurn.PCMove:
+            self.playerTurn = PlayerTurn.PCAct
+        elif self.playerTurn == PlayerTurn.NPCMove:
+            self.playerTurn = PlayerTurn.NPCAct
+
+    def turn_change_space(self):
+        # print(f"Switching turn from {self.playerTurn}")
+        if self.playerTurn == PlayerTurn.start:
+            self.playerTurn = PlayerTurn.PCMove
+        elif self.playerTurn == PlayerTurn.PCAct:
+            self.playerTurn = PlayerTurn.NPCMove
+        elif self.playerTurn == PlayerTurn.NPCAct:
+            time.delay(500)
+            self.playerTurn = PlayerTurn.PCMove
+            self.initialToPlaying = False
+            self.turn_count += 1
+
+    def game_over_check(self, PC_sunlight, NPC_sunlight):
+        if (PC_sunlight <= 0 or NPC_sunlight <= 0 or self.turn_count >= 50) and self.gameStatus != GameStatus.end:
+            self.winner = self.NPCName if PC_sunlight < NPC_sunlight else self.PCName
+            self.gameStatus = GameStatus.over
+
+    def draw_game_over(self, PC_sunlight, NPC_sunlight):
+        self.gameStatus = GameStatus.end
+        self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))
+        text = self.font.render(f"Winner: {self.winner}! Reduced {max(PC_sunlight, NPC_sunlight)} tons of CO2!", True, (0, 255, 0))
+        self.screen.blit(text, (175, 325))
+        self.screen.blit(self.gameWin if self.winner == self.PCName else self.gameFail, (175, 325))
+        display.update()
+
+    def __play_again(self):
+        self.gameStatus = GameStatus.start
+        self.playerTurn = PlayerTurn.start
+        self.PCActKey = [0, 0, 0, 0]
+        self.cheat = [0, 0, 0]
+        self.diceLocation = [self.diceBoard[0]]
+        self.diceSteps = (0, 0, True)
+        self.turn_count = 0
+
+    def __quit(self):
+        if self.backgroundMusic.isPlaying:
+            mixer.music.fadeout(1500)
+            time.delay(1500)
+        pygame.quit()
+        self.gameStatus = GameStatus.quit
