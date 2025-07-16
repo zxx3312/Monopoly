@@ -43,12 +43,12 @@ if __name__ == "__main__":
             gameManager.draw_messages((hero.messages(landmasses), enemy.messages(landmasses)))
             gameManager.draw_fix_dice(shootDice.finalPoints)
             gameManager.draw_music_button()
-            gameManager.game_over_check(hero.sunlight, enemy.sunlight)
+            gameManager.game_over_check(hero.carbon, enemy.carbon, hero.gold, enemy.gold)
             gameManager.draw_tips()
 
             if gameManager.playerTurn == PlayerTurn.PCMove:
                 gameManager.diceSteps = hero.move()
-                hero.position = (hero.position + gameManager.diceSteps[0]) % 40
+                hero.position = (hero.position + gameManager.diceSteps[0]) % 44
                 effect = hero.incidents(landmasses)
                 if effect == "trade" and hero.chance:
                     hero.gold, enemy.gold = enemy.gold, hero.gold
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
             elif gameManager.playerTurn == PlayerTurn.NPCMove:
                 gameManager.diceSteps = enemy.move()
-                enemy.position = (enemy.position + gameManager.diceSteps[0]) % 40
+                enemy.position = (enemy.position + gameManager.diceSteps[0]) % 44
                 effect = enemy.incidents(landmasses)
                 if effect == "trade" and enemy.chance:
                     hero.gold, enemy.gold = enemy.gold, hero.gold
@@ -89,4 +89,17 @@ if __name__ == "__main__":
             print(f"Current turn: {gameManager.playerTurn}")
 
         if gameManager.gameStatus == GameStatus.over:
-            gameManager.draw_game_over(hero.sunlight, enemy.sunlight)
+            gameManager.draw_game_over(hero.carbon, enemy.carbon)
+
+        
+        if gameManager.playerTurn == PlayerTurn.PCMove:
+            if hero.skip_turn:
+                hero.skip_turn = False
+                gameManager.turn_change()
+                continue
+
+        if gameManager.playerTurn == PlayerTurn.NPCMove:
+            if enemy.skip_turn:
+                enemy.skip_turn = False
+                gameManager.turn_change()
+                continue

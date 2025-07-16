@@ -1,4 +1,6 @@
 import pygame
+import asyncio
+import platform
 from pygame import display, event, font, image, time, mixer
 from pygame.locals import *
 from MusicPlay import MusicPlay
@@ -11,7 +13,7 @@ class GameManager:
         self.clock = time.Clock()
         self.source = "./source/"
         self.font = font.Font(self.source + "simhei.ttf", 20)
-        self.screen = display.set_mode((800,800))
+        self.screen = display.set_mode((800, 800))
         display.set_icon(self.__image_load("Dog.ico"))
         display.set_caption("环保作物种植")
         self.music = mixer.music.load(self.source + "BackgroundMusic.mp3")
@@ -22,9 +24,10 @@ class GameManager:
         self.playerTurn = PlayerTurn.start
         self.cheat = [0, 0, 0]
         self.spaceKeyDown = event.Event(KEYDOWN, key=K_SPACE)
-        self.PCActKey = [0, 0, 0, 0]  # K_b, K_p, K_u, K_f
+        self.PCActKey = [0, 0, 0, 0]
         self.winner = ""
         self.turn_count = 0
+        self.dice_animation_done = False  # 新增标志，控制骰子动画完成
 
         self.start = self.__image_load("Start.png")
         self.gameFail = self.__image_load("GameFail.png")
@@ -55,13 +58,8 @@ class GameManager:
         self.diceLocation = [self.diceBoard[0]]
         self.diceSteps = (0, 0, True)
 
-        # self.plantImages = [
-        #     [self.__image_load(f"{plant}{i}.png") for i in range(1, 4)]
-        #     for plant in ["Seaweed", "WaterGrass", "Sunflower", "Tree", "Forest"]
-        # ]
-        self.plantImages = self.__image_load("any.png")
-        # self.factoryImages = [self.__image_load(f"Factory{i}.png") for i in range(1, 4)]
-        self.factoryImages = self.__image_load("any.png")
+        self.plantImages = [[self.__image_load(f"any.png") for i in range(1, 5)] for plant in ["Seaweed", "WaterGrass", "Sunflower", "Tree", "Forest"]]
+        self.factoryImages = [self.__image_load(f"any.png") for i in range(1, 5)]
         self.wasteland = self.__image_load("Wasteland.png")
         self.tips_texts = [
             "海藻吸收二氧化碳，促进海洋碳汇！",
@@ -70,9 +68,24 @@ class GameManager:
             "森林是地球的肺，每年吸收大量碳。"
         ]
 
+    async def main_loop(self):
+        while self.gameStatus != GameStatus.quit:
+            self.event_deal()
+            if self.gameStatus == GameStatus.start:
+                self.draw_beginning()
+                self.gameStatus = GameStatus.waitIn
+            elif self.gameStatus == GameStatus.initial:
+                self.__initialize_game()
+                self.gameStatus = GameStatus.playing
+                self.initialToPlaying = True
+            elif self.gameStatus == GameStatus.playing:
+                await self.__play_game()
+            elif self.gameStatus == GameStatus.over:
+                self.draw_game_over(self.hero.carbon, self.enemy.carbon)
+            await asyncio.sleep(0.1)
+
     def event_deal(self):
         for even in event.get():
-            # print(even.type, KEYDOWN)
             if even.type == QUIT or (even.type == KEYDOWN and even.key == K_e):
                 self.__quit()
             if even.type == KEYDOWN:
@@ -105,12 +118,10 @@ class GameManager:
             img = image.load(self.source + name).convert_alpha()
             if name == "EcoMap.png":
                 img = pygame.transform.scale(img, (800, 800))
-            # print(f"Loaded {name}: {img.get_size()}")
             return img
         except pygame.error:
-            # print(f"Error loading image: {self.source + name}")
             return image.load(self.source + "Wasteland.png").convert_alpha()
-    
+
     def draw_beginning(self):
         for j in range(150):
             self.clock.tick(300)
@@ -124,18 +135,19 @@ class GameManager:
     def draw_map(self):
         self.screen.blit(self.gameMap, (0, 0))
 
-    @staticmethod
-    def __location_convert(position):
-        grid_size = 72  # 调整为新格子尺寸
-        if position <= 10:
+    def __location_convert(self, position):
+        grid_size = 72
+        if position < 11:
             return position * grid_size, 0
-        if position <= 21:
-            return 10 * grid_size, (position - 11) * grid_size
-        if position <= 32:
-            return (10 - (position - 22)) * grid_size, 10 * grid_size
-        if position <= 43:
-            return 0, (10 - (position - 33)) * grid_size
-            
+        elif position < 22:
+            return 10 * grid_size, (position - 10) * grid_size
+        elif position < 33:
+            return (32 - position) * grid_size, 10 * grid_size
+        elif position < 44:
+            return 0, (43 - position) * grid_size
+        else:
+            return 0, 0
+
     def draw_character(self, PC_pos, NPC_pos):
         if self.playerTurn in [PlayerTurn.PCAct, PlayerTurn.NPCMove, PlayerTurn.start] or self.initialToPlaying:
             self.screen.blit(self.NPCImage, self.__location_convert(NPC_pos))
@@ -195,7 +207,6 @@ class GameManager:
             self.cheat[2] = 1
 
     def __set_PC_act_key(self, event):
-        print(f"Key pressed: {event.key}")
         if event.key == K_b:
             self.PCActKey[0] = event.key
         if event.key == K_p:
@@ -224,18 +235,20 @@ class GameManager:
     def __set_dice_location(self):
         self.diceLocation = [self.diceBoard[0]]
 
-    def draw_dice(self, final_points, random_series):
+    async def draw_dice(self, final_points, random_series):
         if self.diceSteps[2] is False and self.playerTurn in [PlayerTurn.PCMove, PlayerTurn.NPCMove]:
             self.__set_dice_location()
             self.clock.tick(5)
-            for rand in random_series[:10]:  # 缩短动画
+            for rand in random_series[:10]:
                 self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))
                 self.screen.blit(self.diceImages[rand], self.diceLocation[0])
                 display.update()
+                await asyncio.sleep(0.1)  # 每帧延时0.1秒，模拟动画
             self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))
             self.screen.blit(self.diceImages[final_points[0] - 1], self.diceLocation[0])
             display.update()
-            time.delay(700)
+            await asyncio.sleep(0.7)  # 动画完成后延时0.7秒
+            self.dice_animation_done = True  # 动画完成，允许移动
 
     def draw_fix_dice(self, final_points):
         self.screen.blit(self.diceImages[final_points[0] - 1], self.diceLocation[0])
@@ -266,7 +279,6 @@ class GameManager:
             self.playerTurn = PlayerTurn.NPCAct
 
     def turn_change_space(self):
-        # print(f"Switching turn from {self.playerTurn}")
         if self.playerTurn == PlayerTurn.start:
             self.playerTurn = PlayerTurn.PCMove
         elif self.playerTurn == PlayerTurn.PCAct:
@@ -277,15 +289,27 @@ class GameManager:
             self.initialToPlaying = False
             self.turn_count += 1
 
-    def game_over_check(self, PC_sunlight, NPC_sunlight):
-        if (PC_sunlight <= 0 or NPC_sunlight <= 0 or self.turn_count >= 50) and self.gameStatus != GameStatus.end:
-            self.winner = self.NPCName if PC_sunlight < NPC_sunlight else self.PCName
-            self.gameStatus = GameStatus.over
+    def game_over_check(self, PC_carbon, NPC_carbon, PC_gold, NPC_gold):
+        if self.gameStatus != GameStatus.end:
+            if PC_gold <= 0:
+                self.winner = self.NPCName
+                self.gameStatus = GameStatus.over
+            elif NPC_gold <= 0:
+                self.winner = self.PCName
+                self.gameStatus = GameStatus.over
+            elif PC_carbon <= 0 or NPC_carbon <= 0 or PC_carbon > 120 or NPC_carbon > 120 or self.turn_count >= 50:
+                if PC_carbon < NPC_carbon:
+                    self.winner = self.PCName
+                elif NPC_carbon < PC_carbon:
+                    self.winner = self.NPCName
+                else:
+                    self.winner = "平局"
+                self.gameStatus = GameStatus.over
 
-    def draw_game_over(self, PC_sunlight, NPC_sunlight):
+    def draw_game_over(self, PC_carbon, NPC_carbon):
         self.gameStatus = GameStatus.end
         self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))
-        text = self.font.render(f"Winner: {self.winner}! Reduced {max(PC_sunlight, NPC_sunlight)} tons of CO2!", True, (0, 255, 0))
+        text = self.font.render(f"Winner: {self.winner}! Reduced {max(PC_carbon, NPC_carbon)} tons of CO2!", True, (0, 255, 0))
         self.screen.blit(text, (175, 325))
         self.screen.blit(self.gameWin if self.winner == self.PCName else self.gameFail, (175, 325))
         display.update()
@@ -298,6 +322,7 @@ class GameManager:
         self.diceLocation = [self.diceBoard[0]]
         self.diceSteps = (0, 0, True)
         self.turn_count = 0
+        self.dice_animation_done = False
 
     def __quit(self):
         if self.backgroundMusic.isPlaying:
@@ -305,3 +330,87 @@ class GameManager:
             time.delay(1500)
         pygame.quit()
         self.gameStatus = GameStatus.quit
+
+    def __initialize_game(self):
+        from Player.PC import PC
+        from Player.NPC import NPC
+        from LandManage import Landmasses
+        from ShootDice import ShootDice
+        self.hero = PC("EcoWorker")
+        self.enemy = NPC("IndustryRep")
+        self.landmasses = Landmasses(self.hero.name, self.enemy.name)
+        self.shootDice = ShootDice()
+        self.get_character_name(self.hero.name, self.enemy.name)
+
+    async def __play_game(self):
+        self.clock.tick(10)
+        self.hero.update(self.landmasses)
+        self.enemy.update(self.landmasses)
+        self.draw_map()
+        self.draw_lands(self.landmasses.lands)
+        self.draw_character(self.hero.position, self.enemy.position)
+        self.draw_active_status()
+        self.draw_messages((self.hero.messages(self.landmasses), self.enemy.messages(self.landmasses)))
+        self.draw_fix_dice(self.shootDice.finalPoints)
+        self.draw_music_button()
+        self.game_over_check(self.hero.carbon, self.enemy.carbon, self.hero.gold, self.enemy.gold)
+        self.draw_tips()
+
+        if self.playerTurn == PlayerTurn.PCMove:
+            if self.hero.skip_turn:
+                self.hero.skip_turn = False
+                self.dice_animation_done = False
+                self.turn_change()
+                return
+            self.diceSteps = self.hero.move()
+            self.shootDice.set_dice(self.diceSteps)
+            await self.draw_dice(self.shootDice.finalPoints, self.shootDice.randomSeries)
+            if self.dice_animation_done:
+                self.hero.position = (self.hero.position + self.diceSteps[0]) % 44
+                effect = self.hero.incidents(self.landmasses)
+                if effect == "trade" and self.hero.chance:
+                    self.hero.gold, self.enemy.gold = self.enemy.gold, self.hero.gold
+                    self.hero.chance = False
+                self.dice_animation_done = False
+
+        elif self.playerTurn == PlayerTurn.PCAct:
+            land = self.landmasses.lands[self.hero.position]
+            if self.PCActKey[0] == K_b:
+                self.hero.buy(land, self.landmasses.is_full(self.hero.name))
+            elif self.PCActKey[1] == K_p:
+                self.hero.plant(land, 0)
+            elif self.PCActKey[2] == K_u:
+                self.hero.upgrade(land)
+            elif self.PCActKey[3] == K_f:
+                self.hero.build_factory(land)
+            self.PCActKey = [0, 0, 0, 0]
+
+        elif self.playerTurn == PlayerTurn.NPCMove:
+            if self.enemy.skip_turn:
+                self.enemy.skip_turn = False
+                self.dice_animation_done = False
+                self.turn_change()
+                return
+            self.diceSteps = self.enemy.move()
+            self.shootDice.set_dice(self.diceSteps)
+            await self.draw_dice(self.shootDice.finalPoints, self.shootDice.randomSeries)
+            if self.dice_animation_done:
+                self.enemy.position = (self.enemy.position + self.diceSteps[0]) % 44
+                effect = self.enemy.incidents(self.landmasses)
+                if effect == "trade" and self.enemy.chance:
+                    self.hero.gold, self.enemy.gold = self.enemy.gold, self.hero.gold
+                    self.enemy.chance = False
+                self.dice_animation_done = False
+
+        elif self.playerTurn == PlayerTurn.NPCAct:
+            self.enemy.act(self.landmasses)
+            self.post_space_key_down()
+
+        self.turn_change()
+        self.image_update()
+
+if platform.system() == "Emscripten":
+    asyncio.ensure_future(GameManager().main_loop())
+else:
+    if __name__ == "__main__":
+        asyncio.run(GameManager().main_loop())
