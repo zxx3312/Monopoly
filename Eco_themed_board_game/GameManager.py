@@ -240,14 +240,14 @@ class GameManager:
             self.__set_dice_location()
             self.clock.tick(5)
             for rand in random_series[:10]:
-                self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))
-                self.screen.blit(self.diceImages[rand], self.diceLocation[0])
+                # self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))
+                # self.screen.blit(self.diceImages[rand], self.diceLocation[0])
                 display.update()
                 await asyncio.sleep(0.1)  # 每帧延时0.1秒，模拟动画
-            self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))
-            self.screen.blit(self.diceImages[final_points[0] - 1], self.diceLocation[0])
+            # self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))
+            # self.screen.blit(self.diceImages[final_points[0] - 1], self.diceLocation[0])
             display.update()
-            await asyncio.sleep(0.7)  # 动画完成后延时0.7秒
+            await asyncio.sleep(0.1)  # 动画完成后延时0.1秒
             self.dice_animation_done = True  # 动画完成，允许移动
 
     def draw_fix_dice(self, final_points):
@@ -282,9 +282,10 @@ class GameManager:
         if self.playerTurn == PlayerTurn.start:
             self.playerTurn = PlayerTurn.PCMove
         elif self.playerTurn == PlayerTurn.PCAct:
+            time.delay(1500)
             self.playerTurn = PlayerTurn.NPCMove
         elif self.playerTurn == PlayerTurn.NPCAct:
-            time.delay(500)
+            time.delay(1500)
             self.playerTurn = PlayerTurn.PCMove
             self.initialToPlaying = False
             self.turn_count += 1
@@ -408,6 +409,13 @@ class GameManager:
 
         self.turn_change()
         self.image_update()
+
+    def draw_card_message(self, card_name):
+        self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))  # 清空骰子区域
+        card_text = self.font.render(f"卡片: {card_name}", True, (255, 0, 0))  # 红色文字显示卡片名称
+        self.screen.blit(card_text, (18 * 25, 17 * 25 + 50))  # 显示在骰子区域下方
+        display.update()
+        time.delay(3000)  # 延时3秒
 
 if platform.system() == "Emscripten":
     asyncio.ensure_future(GameManager().main_loop())

@@ -154,6 +154,8 @@ class NPC(Player):
                 self.chance = True
             elif land.incident == Incidents.card:
                 messages.append(f"事件：对手抽到道具卡 - {self.item}")
+        elif land.position == 0:
+            messages.append("事件：你到达起点，获得100金币")
         elif land.owner == "机会":
             messages.append(f"机会卡：{self.item}")
         elif land.owner == "监狱":

@@ -26,8 +26,8 @@ class OneLand:
 class Landmasses:
     def __init__(self, PCName, NPCName):
         self.lands = []
-        self.PCName = PCName
-        self.NPCName = NPCName
+        self.PC = PCName
+        self.NPC = NPCName
         event_positions = [1, 5, 8, 13, 19, 25, 29, 35, 40]
         opportunity_positions = [3, 6, 10, 15, 17, 21, 27, 31, 37, 42]
         jail_position = 22
@@ -48,13 +48,13 @@ class Landmasses:
         self.NPCAwardMessage = 0
 
     def is_full(self, name):
-        if name == self.PCName and self.PCAward:
+        if name == self.PC.name and self.PCAward:
             return False
-        if name == self.NPCName and self.NPCAward:
+        if name == self.NPC.name and self.NPCAward:
             return False
         counter = sum(1 for land in self.lands if land.owner != "系统" and land.owner != "事件" and land.owner != "机会" and land.owner != "监狱")
         if counter >= 32:
-            if name == self.PCName:
+            if name == self.PC.name:
                 self.PCAward = True
             else:
                 self.NPCAward = True

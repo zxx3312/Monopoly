@@ -1,5 +1,6 @@
 import random
 from Enums import Incidents
+from GameManager import GameManager
 
 def trigger_event_card(player, landmasses):
     effects = [
@@ -37,12 +38,14 @@ def trigger_event_card(player, landmasses):
     ]
     name, func = random.choice(effects)
     print(f"触发事件卡：{name}")
+    game_manager = GameManager()
+    game_manager.draw_card_message(name)
     func()
     return name
 
 def trigger_opportunity_card(player, landmasses):
     options = [
-        ("幸运起点", lambda: (setattr(player, "position", 0), player.gold.__add__(100)), 0.50),
+        # ("幸运起点", lambda: (setattr(player, "position", 0), player.gold.__add__(100)), 0.50),
         ("前进之路", lambda: setattr(player, "position", (player.position + random.randint(3, 5)) % 44), 0.30),
         ("短暂停留", lambda: setattr(player, "skip_turn", True), 0.20),
         ("财富惊喜", lambda: player.gold.__add__(random.randint(50, 100)), 0),
@@ -50,7 +53,7 @@ def trigger_opportunity_card(player, landmasses):
         ("机会挑战", lambda: player.gold.__sub__(20) if player.gold >= 20 else setattr(player, "carbon", min(player.carbon + 10, 120)), 0),
         ("土地赠送", lambda: gift_random_land(player, landmasses), 0),
         ("碳足迹减免", lambda: setattr(player, "carbon", max(0, player.carbon - random.randint(5, 15))), 0),
-        ("金币交换", lambda: swap_gold(player, landmasses, random.randint(50, 100)), 0),
+        # ("金币交换", lambda: swap_gold(player, landmasses, random.randint(50, 100)), 0),
         ("随机跳跃", lambda: setattr(player, "position", random.randint(1, 43)), 0),
         ("进监狱", lambda: (setattr(player, "position", 22), setattr(player, "skip_turn", True)), 0)
     ]
@@ -62,6 +65,8 @@ def trigger_opportunity_card(player, landmasses):
     else:
         name, func = random.choice([(name, func) for name, func, prob in options if prob == 0])
     print(f"触发机会卡：{name}")
+    game_manager = GameManager()
+    game_manager.draw_card_message(name)
     func()
     return name
 
@@ -149,7 +154,7 @@ def handle_pollution_leak(player):
         player.carbon = min(120, player.carbon + 15)
 
 def swap_random_asset(player, landmasses):
-    opponent = landmasses.PCName if player.name == landmasses.NPCName else landmasses.NPCName
+    opponent = landmasses.PC.name if player.name == landmasses.NPC.name else landmasses.NPC.name
     player_lands = [l for l in landmasses.lands if l.owner == player.name]
     opponent_lands = [l for l in landmasses.lands if l.owner == opponent]
     if player_lands and opponent_lands:
@@ -172,17 +177,14 @@ def replan_random_land(player, landmasses):
 def assist_opponent(player, landmasses):
     if player.gold >= 20:
         player.gold -= 20
-        opponent = landmasses.PCName if player.name == landmasses.NPCName else landmasses.NPCName
-        for p in [landmasses.PCName, landmasses.NPCName]:
-            if p == opponent:
-                other_player = p
-                other_player.carbon = max(0, other_player.carbon - 10)
+        opponent = landmasses.PC if player.name == landmasses.NPC.name else landmasses.NPC
+        opponent.carbon = max(0, opponent.carbon - 10)
 
 def adjust_market_prices(player):
     player.price_modifier = random.uniform(0.8, 1.2)
 
 def swap_random_land(player, landmasses):
-    opponent = landmasses.PCName if player.name == landmasses.NPCName else landmasses.NPCName
+    opponent = landmasses.PC.name if player.name == landmasses.NPC.name else landmasses.NPC.name
     player_lands = [l for l in landmasses.lands if l.owner == player.name]
     opponent_lands = [l for l in landmasses.lands if l.owner == opponent]
     if player_lands and opponent_lands:
@@ -191,8 +193,8 @@ def swap_random_land(player, landmasses):
         land1.owner, land2.owner = land2.owner, land1.owner
 
 def challenge_opponent(player, landmasses):
-    opponent = landmasses.PCName if player.name == landmasses.NPCName else landmasses.NPCName
-    for p in [landmasses.PCName, landmasses.NPCName]:
+    opponent = landmasses.PC.name if player.name == landmasses.NPC.name else landmasses.NPC.name
+    for p in [landmasses.PC.name, landmasses.NPC.name]:
         if p == opponent:
             other_player = p
     if player.carbon > other_player.carbon and player.gold >= 30:
@@ -206,13 +208,13 @@ def restore_random_land(player, landmasses):
         player.carbon = max(0, player.carbon - 10)
 
 def trade_resources(player, landmasses):
-    opponent = landmasses.PCName if player.name == landmasses.NPCName else landmasses.NPCName
+    opponent = landmasses.PC.name if player.name == landmasses.NPC.name else landmasses.NPC.name
     resource = random.choice(["gold", "land"])
     if resource == "gold":
         amount = random.randint(50, 100)
         if player.gold >= amount:
             player.gold -= amount
-            for p in [landmasses.PCName, landmasses.NPCName]:
+            for p in [landmasses.PC.name, landmasses.NPC.name]:
                 if p == opponent:
                     other_player = p
                     other_player.gold += amount
