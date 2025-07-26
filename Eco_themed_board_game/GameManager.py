@@ -12,8 +12,9 @@ class GameManager:
         pygame.init()
         self.clock = time.Clock()
         self.source = "./source/"
-        self.font = font.Font(self.source + "simhei.ttf", 20)
-        self.screen = display.set_mode((800, 800))
+        self.font = font.Font(self.source + "simhei.ttf", 17)
+        # 调整窗口大小，保持棋盘比例 7562/7506 ≈ 1.0076
+        self.screen = display.set_mode((756, 750))
         display.set_icon(self.__image_load("Dog.ico"))
         display.set_caption("环保作物种植")
         self.music = mixer.music.load(self.source + "BackgroundMusic.mp3")
@@ -27,7 +28,7 @@ class GameManager:
         self.PCActKey = [0, 0, 0, 0]
         self.winner = ""
         self.turn_count = 0
-        self.dice_animation_done = False  # 新增标志，控制骰子动画完成
+        self.dice_animation_done = False
 
         self.start = self.__image_load("Start.png")
         self.gameFail = self.__image_load("GameFail.png")
@@ -38,29 +39,40 @@ class GameManager:
         self.musicOff = self.__image_load("MusicOff.png")
         self.musicImage = self.musicOn
         self.musicBarrier = self.__image_load("MusicBarrier.png")
-        self.musicButtonLocation = (41 * 25, 27 * 25)
-        self.musicButtonRect = Rect(41 * 25, 27 * 25, 100, 75)
+        self.musicButtonLocation = (41 * 25 * 756 / 800, 27 * 25 * 750 / 800)  # 缩放音乐按钮位置
+        self.musicButtonRect = Rect(self.musicButtonLocation[0], self.musicButtonLocation[1], 100 * 756 / 800, 75 * 750 / 800)
         self.activeOn = self.__image_load("ActiveOn.png")
         self.activeOff = self.__image_load("ActiveOff.png")
 
-        self.PCName = ""
-        self.PCImage = self.__image_load("PC.png")
-        self.PCFixImage = self.__image_load("PCFix.png")
-        self.PCBoard = [(5 * 25, 4 * 25 + 12), (5 * 25, 8 * 25)]
-        self.NPCName = ""
-        self.NPCImage = self.__image_load("NPC.png")
-        self.NPCFixImage = self.__image_load("NPCFix.png")
-        self.NPCBoard = [(27 * 25, 4 * 25 + 12), (27 * 25, 8 * 25)]
+        self.PCName = "PC"
+        self.PCImage = self.__image_load("PC.png", scale_to=(74, 72))
+        self.PCFixImage = self.__image_load("PCFix.png", scale_to=(74, 72))
+        # 原始棋盘中 PC 区域
+        self.PCBoard = [
+            (1169 / 7562 * self.screen.get_width(), 2753 / 7506 * self.screen.get_height()),
+            (1169 / 7562 * self.screen.get_width(), 4407 / 7506 * self.screen.get_height())
+        ]
+        
+        self.NPCName = "NPC"
+        self.NPCImage = self.__image_load("NPC.png", scale_to=(74, 72))
+        self.NPCFixImage = self.__image_load("NPCFix.png", scale_to=(74, 72))
+        # NPC 是对称位置
+        self.NPCBoard = [
+            ((7562 - 3567) / 7562 * self.screen.get_width(), 2753 / 7506 * self.screen.get_height()),
+            ((7562 - 3567) / 7562 * self.screen.get_width(), 4407 / 7506 * self.screen.get_height())
+        ]
 
         self.diceImages = [self.__image_load(f"Dice{j+1}.png") for j in range(6)]
         self.diceBarrier = self.__image_load("DiceBarrier.png")
-        self.diceBoard = [(22 * 25, 18 * 25 + 5), (19 * 25 + 12, 18 * 25 + 5), (24 * 25 + 13, 18 * 25 + 5)]
+        self.diceBoard = [(22 * 25 * 756 / 800, 18 * 25 * 750 / 800 + 5), 
+                          (19 * 25 * 756 / 800 + 12, 18 * 25 * 750 / 800 + 5), 
+                          (24 * 25 * 756 / 800 + 13, 18 * 25 * 750 / 800 + 5)]
         self.diceLocation = [self.diceBoard[0]]
         self.diceSteps = (0, 0, True)
 
-        self.plantImages = [[self.__image_load(f"any.png") for i in range(1, 5)] for plant in ["Seaweed", "WaterGrass", "Sunflower", "Tree", "Forest"]]
-        self.factoryImages = [self.__image_load(f"any.png") for i in range(1, 5)]
-        self.wasteland = self.__image_load("Wasteland.png")
+        self.plantImages = [[self.__image_load(f"{plant}.png", scale_to=(74, 72)) for i in range(1, 5)] for plant in ["Seaweed", "WaterGrass", "Sunflower", "Tree", "Forest"]]
+        self.factoryImages = [self.__image_load(f"factory{i}.png", scale_to=(74, 72)) for i in range(1, 5)]
+        self.wasteland = self.__image_load("Wasteland.png", scale_to=(74, 72))
         self.tips_texts = [
             "海藻吸收二氧化碳，促进海洋碳汇！",
             "水草为海洋生态提供氧气和栖息地。",
@@ -80,6 +92,16 @@ class GameManager:
                 self.initialToPlaying = True
             elif self.gameStatus == GameStatus.playing:
                 await self.__play_game()
+                # 强制重绘屏幕
+                self.draw_map()
+                self.draw_lands(self.landmasses.lands)
+                self.draw_character(self.hero.position, self.enemy.position)
+                self.draw_active_status()
+                self.draw_messages((self.hero.messages(self.landmasses), self.enemy.messages(self.landmasses)))
+                self.draw_fix_dice(self.shootDice.finalPoints)
+                self.draw_music_button()
+                self.draw_tips()
+                display.update()
             elif self.gameStatus == GameStatus.over:
                 self.draw_game_over(self.hero.carbon, self.enemy.carbon)
             await asyncio.sleep(0.1)
@@ -113,22 +135,27 @@ class GameManager:
     def image_update():
         display.update()
 
-    def __image_load(self, name):
+    def __image_load(self, name, scale_to=None):
         try:
             img = image.load(self.source + name).convert_alpha()
             if name == "EcoMap.png":
-                img = pygame.transform.scale(img, (800, 800))
+                img = pygame.transform.scale(img, (756, 750))
+            elif scale_to:
+                img = pygame.transform.scale(img, scale_to)
             return img
         except pygame.error:
-            return image.load(self.source + "Wasteland.png").convert_alpha()
+            img = image.load(self.source + "Wasteland.png").convert_alpha()
+            if scale_to:
+                img = pygame.transform.scale(img, scale_to)
+            return img
 
     def draw_beginning(self):
         for j in range(150):
             self.clock.tick(300)
             self.screen.blit(self.gameMap, (0, 0))
-            self.screen.blit(self.PCFixImage, (6 * 25 + 13 + j * 1 - 10, 6 * 25 + 13 - 10))
-            self.screen.blit(self.NPCFixImage, (38 * 25 + 13 - j * 1 - 10, 6 * 25 + 13 - 10))
-            self.screen.blit(self.start, (175, 325))
+            self.screen.blit(self.PCFixImage, (6 * 25 * 756 / 800 + 13 + j * 1 - 10, 6 * 25 * 750 / 800 + 13 - 10))
+            self.screen.blit(self.NPCFixImage, (38 * 25 * 756 / 800 + 13 - j * 1 - 10, 6 * 25 * 750 / 800 + 13 - 10))
+            self.screen.blit(self.start, (175 * 756 / 800, 325 * 750 / 800))
             self.screen.blit(self.musicImage, self.musicButtonLocation)
             display.update()
 
@@ -136,17 +163,47 @@ class GameManager:
         self.screen.blit(self.gameMap, (0, 0))
 
     def __location_convert(self, position):
-        grid_size = 72
-        if position < 11:
-            return position * grid_size, 0
+        # 棋盘尺寸从 (7562, 7506) 缩放到 (756, 750)
+        scale_x, scale_y = 756 / 7562, 750 / 7506
+        grid_width = (1028 - 102) * scale_x  # 约 92.6
+        grid_height = (1013 - 109) * scale_y  # 约 90.4
+
+        if position == 0:
+            x = 102
+            y = 109
+            return x * scale_x, y * scale_y
+        elif position < 11:
+            # 顶部：0-11，x 从 102 到 6458，y 固定 109
+            x = 1028 + (position - 1) * (6458 - 1028) / 10
+            y = 109
+            return x * scale_x, y * scale_y
+        elif position == 11:
+            x = 6458
+            y = 109
+            return x * scale_x, y * scale_y
         elif position < 22:
-            return 10 * grid_size, (position - 10) * grid_size
+            # 右边：11-22，x 固定 6458，y 从 109 到 6451
+            x = 6458
+            y = 1013 + (position - 11 -1) * (6451 - 1013) / 10
+            return x * scale_x, y * scale_y
+        elif position == 22:
+            x = 6458
+            y = 6451
+            return x * scale_x, y * scale_y
         elif position < 33:
-            return (32 - position) * grid_size, 10 * grid_size
-        elif position < 44:
-            return 0, (43 - position) * grid_size
+            # 底部：22-33，x 从 6458 到 102（逆序），y 固定 6451
+            x = 6458 - (position - 22 - 1) * (6458 - 1028) / 10
+            y = 6451
+            return x * scale_x, y * scale_y
+        elif position == 33:
+            x = 102
+            y = 6451
+            return x * scale_x, y * scale_y
         else:
-            return 0, 0
+            # 左边：33-44（回到0），x 固定 102，y 从 6451 到 109（逆序）
+            x = 102
+            y = 6451 - (position - 33 - 1) * (6451 - 1013) / 10
+            return x * scale_x, y * scale_y
 
     def draw_character(self, PC_pos, NPC_pos):
         if self.playerTurn in [PlayerTurn.PCAct, PlayerTurn.NPCMove, PlayerTurn.start] or self.initialToPlaying:
@@ -155,25 +212,26 @@ class GameManager:
         else:
             self.screen.blit(self.PCImage, self.__location_convert(PC_pos))
             self.screen.blit(self.NPCImage, self.__location_convert(NPC_pos))
-        self.screen.blit(self.PCFixImage, (19 * 25 - 21, 4 * 25))
-        self.screen.blit(self.NPCFixImage, (41 * 25 - 21, 4 * 25))
+        self.screen.blit(self.PCFixImage, (116.9, 275.3))
+        self.screen.blit(self.NPCFixImage, (395.5, 275.3))
 
     def draw_active_status(self):
+        scale_x, scale_y = 756 / 7562, 750 / 7506
         if self.playerTurn in [PlayerTurn.PCMove, PlayerTurn.PCAct]:
-            self.screen.blit(self.activeOn, (4 * 25, 4 * 25))
-            self.screen.blit(self.activeOn, (4 * 25, 8 * 25))
-            self.screen.blit(self.activeOff, (26 * 25, 4 * 25))
-            self.screen.blit(self.activeOff, (26 * 25, 8 * 25))
+            self.screen.blit(self.activeOn, (4 * 25 * scale_x, 4 * 25 * scale_y))
+            self.screen.blit(self.activeOn, (4 * 25 * scale_x, 8 * 25 * scale_y))
+            self.screen.blit(self.activeOff, (26 * 25 * scale_x, 4 * 25 * scale_y))
+            self.screen.blit(self.activeOff, (26 * 25 * scale_x, 8 * 25 * scale_y))
         elif self.playerTurn in [PlayerTurn.NPCMove, PlayerTurn.NPCAct]:
-            self.screen.blit(self.activeOff, (4 * 25, 4 * 25))
-            self.screen.blit(self.activeOff, (4 * 25, 8 * 25))
-            self.screen.blit(self.activeOn, (26 * 25, 4 * 25))
-            self.screen.blit(self.activeOn, (26 * 25, 8 * 25))
+            self.screen.blit(self.activeOff, (4 * 25 * scale_x, 4 * 25 * scale_y))
+            self.screen.blit(self.activeOff, (4 * 25 * scale_x, 8 * 25 * scale_y))
+            self.screen.blit(self.activeOn, (26 * 25 * scale_x, 4 * 25 * scale_y))
+            self.screen.blit(self.activeOn, (26 * 25 * scale_x, 8 * 25 * scale_y))
         else:
-            self.screen.blit(self.activeOff, (4 * 25, 4 * 25))
-            self.screen.blit(self.activeOff, (4 * 25, 8 * 25))
-            self.screen.blit(self.activeOff, (26 * 25, 4 * 25))
-            self.screen.blit(self.activeOff, (26 * 25, 8 * 25))
+            self.screen.blit(self.activeOff, (4 * 25 * scale_x, 4 * 25 * scale_y))
+            self.screen.blit(self.activeOff, (4 * 25 * scale_x, 8 * 25 * scale_y))
+            self.screen.blit(self.activeOff, (26 * 25 * scale_x, 4 * 25 * scale_y))
+            self.screen.blit(self.activeOff, (26 * 25 * scale_x, 8 * 25 * scale_y))
 
     def draw_lands(self, all_lands):
         for land in all_lands:
@@ -191,9 +249,10 @@ class GameManager:
 
     def draw_tips(self):
         if self.gameStatus != GameStatus.over:
-            self.screen.blit(self.tips, (3 * 25, 27 * 25))
+            scale_x, scale_y = 756 / 7562, 750 / 7506
+            self.screen.blit(self.tips, (3 * 25 * scale_x, 27 * 25 * scale_y))
             tip = self.font.render(random.choice(self.tips_texts), True, (0, 255, 0))
-            self.screen.blit(tip, (3 * 25, 27 * 25 + 50))
+            self.screen.blit(tip, (3 * 25 * scale_x, 27 * 25 * scale_y + 50))
 
     def __developer_pattern_check(self):
         return self.cheat[0] * self.cheat[1] * self.cheat[2] == 1
@@ -240,15 +299,27 @@ class GameManager:
             self.__set_dice_location()
             self.clock.tick(5)
             for rand in random_series[:10]:
-                # self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))
-                # self.screen.blit(self.diceImages[rand], self.diceLocation[0])
+                self.draw_map()
+                self.draw_lands(self.landmasses.lands)
+                self.draw_character(self.hero.position, self.enemy.position)
+                self.draw_active_status()
+                self.draw_messages((self.hero.messages(self.landmasses), self.enemy.messages(self.landmasses)))
+                self.draw_music_button()
+                self.draw_tips()
+                self.screen.blit(self.diceImages[rand], self.diceLocation[0])
                 display.update()
-                await asyncio.sleep(0.1)  # 每帧延时0.1秒，模拟动画
-            # self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))
-            # self.screen.blit(self.diceImages[final_points[0] - 1], self.diceLocation[0])
+                await asyncio.sleep(0.1)
+            self.draw_map()
+            self.draw_lands(self.landmasses.lands)
+            self.draw_character(self.hero.position, self.enemy.position)
+            self.draw_active_status()
+            self.draw_messages((self.hero.messages(self.landmasses), self.enemy.messages(self.landmasses)))
+            self.draw_music_button()
+            self.draw_tips()
+            self.screen.blit(self.diceImages[final_points[0] - 1], self.diceLocation[0])
             display.update()
-            await asyncio.sleep(0.1)  # 动画完成后延时0.1秒
-            self.dice_animation_done = True  # 动画完成，允许移动
+            await asyncio.sleep(2.5)
+            self.dice_animation_done = True
 
     def draw_fix_dice(self, final_points):
         self.screen.blit(self.diceImages[final_points[0] - 1], self.diceLocation[0])
@@ -257,20 +328,20 @@ class GameManager:
         PC_messages = messages[0]
         for j in range(len(PC_messages[0])):
             for k in range(len(PC_messages[0][j])):
-                self.screen.blit(self.font.render(PC_messages[0][j][k], True, [0, 0, 0]), (self.PCBoard[0][0] + k * 25 * 6, self.PCBoard[0][1] + j * 25))
+                self.screen.blit(self.font.render(PC_messages[0][j][k], True, [0, 0, 0]),
+                                (self.PCBoard[0][0] + k * 25 * 6 * 756 / 800, self.PCBoard[0][1] + j * 25 * 750 / 800))
         for j in range(len(PC_messages[1])):
-            self.screen.blit(self.font.render(PC_messages[1][j], True, [0, 0, 255]), (self.PCBoard[1][0], self.PCBoard[1][1] + j * 25))
+            self.screen.blit(self.font.render(PC_messages[1][j], True, [0, 0, 255]),
+                            (self.PCBoard[1][0], self.PCBoard[1][1] + j * 25 * 750 / 800))
 
         NPC_messages = messages[1]
-        if self.__developer_pattern_check():
-            for j in range(len(NPC_messages[0])):
-                for k in range(len(NPC_messages[0][j])):
-                    self.screen.blit(self.font.render(NPC_messages[0][j][k], True, [0, 0, 0]), (self.NPCBoard[0][0] + k * 25 * 6, self.NPCBoard[0][1] + j * 25))
-            for j in range(len(NPC_messages[1])):
-                self.screen.blit(self.font.render(NPC_messages[1][j], True, [0, 0, 255]), (self.NPCBoard[1][0], self.NPCBoard[1][1] + j * 25))
-        else:
-            self.screen.blit(self.font.render("依次按下DWQ进入开发者模式", True, [0, 0, 255]), (27 * 25, 7 * 25))
-            self.screen.blit(self.font.render("查看NPC的状态", True, [0, 0, 255]), (27 * 25, 8 * 25))
+        for j in range(len(NPC_messages[0])):
+            for k in range(len(NPC_messages[0][j])):
+                self.screen.blit(self.font.render(NPC_messages[0][j][k], True, [0, 0, 0]),
+                                (self.NPCBoard[0][0] + k * 25 * 6 * 756 / 800, self.NPCBoard[0][1] + j * 25 * 750 / 800))
+        for j in range(len(NPC_messages[1])):
+            self.screen.blit(self.font.render(NPC_messages[1][j], True, [0, 0, 255]),
+                            (self.NPCBoard[1][0], self.NPCBoard[1][1] + j * 25 * 750 / 800))
 
     def turn_change(self):
         if self.playerTurn == PlayerTurn.PCMove:
@@ -309,10 +380,10 @@ class GameManager:
 
     def draw_game_over(self, PC_carbon, NPC_carbon):
         self.gameStatus = GameStatus.end
-        self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))
+        self.screen.blit(self.diceBarrier, (18 * 25 * 756 / 800, 17 * 25 * 750 / 800))
         text = self.font.render(f"Winner: {self.winner}! Reduced {max(PC_carbon, NPC_carbon)} tons of CO2!", True, (0, 255, 0))
-        self.screen.blit(text, (175, 325))
-        self.screen.blit(self.gameWin if self.winner == self.PCName else self.gameFail, (175, 325))
+        self.screen.blit(text, (175 * 756 / 800, 325 * 750 / 800))
+        self.screen.blit(self.gameWin if self.winner == self.PCName else self.gameFail, (175 * 756 / 800, 325 * 750 / 800))
         display.update()
 
     def __play_again(self):
@@ -338,7 +409,9 @@ class GameManager:
         from LandManage import Landmasses
         from ShootDice import ShootDice
         self.hero = PC("EcoWorker")
+        self.hero.game_manager = self
         self.enemy = NPC("IndustryRep")
+        self.enemy.game_manager = self
         self.landmasses = Landmasses(self.hero.name, self.enemy.name)
         self.shootDice = ShootDice()
         self.get_character_name(self.hero.name, self.enemy.name)
@@ -410,12 +483,27 @@ class GameManager:
         self.turn_change()
         self.image_update()
 
-    def draw_card_message(self, card_name):
-        self.screen.blit(self.diceBarrier, (18 * 25, 17 * 25))  # 清空骰子区域
-        card_text = self.font.render(f"卡片: {card_name}", True, (255, 0, 0))  # 红色文字显示卡片名称
-        self.screen.blit(card_text, (18 * 25, 17 * 25 + 50))  # 显示在骰子区域下方
-        display.update()
-        time.delay(3000)  # 延时3秒
+    async def draw_card_message(self, card_name):
+        display_duration = 3000
+        start_time = time.get_ticks()
+        scale_x, scale_y = 756 / 7562, 750 / 7506
+        while time.get_ticks() - start_time < display_duration:
+            self.draw_map()
+            self.draw_lands(self.landmasses.lands)
+            self.draw_character(self.hero.position, self.enemy.position)
+            self.draw_active_status()
+            self.draw_messages((self.hero.messages(self.landmasses), self.enemy.messages(self.landmasses)))
+            self.draw_fix_dice(self.shootDice.finalPoints)
+            self.draw_music_button()
+            self.draw_tips()
+            background = pygame.Surface((200 * scale_x, 50 * scale_y), pygame.SRCALPHA)
+            background.fill((0, 0, 0, 128))
+            self.screen.blit(background, (18 * 25 * scale_x, 17 * 25 * scale_y + 30))
+            card_text = self.font.render(f"卡片: {card_name}", True, (255, 50, 100))
+            self.screen.blit(card_text, (18 * 25 * scale_x, 17 * 25 * scale_y + 50))
+            display.update()
+            self.clock.tick(60)
+            await asyncio.sleep(0.016)
 
 if platform.system() == "Emscripten":
     asyncio.ensure_future(GameManager().main_loop())
