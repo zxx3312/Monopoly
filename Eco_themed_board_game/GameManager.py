@@ -12,7 +12,7 @@ class GameManager:
         pygame.init()
         self.clock = time.Clock()
         self.source = "./source/"
-        self.font = font.Font(self.source + "simhei.ttf", 17)
+        self.font = font.Font(self.source + "simhei.ttf", 15)
         # 调整窗口大小，保持棋盘比例 7562/7506 ≈ 1.0076
         self.screen = display.set_mode((756, 750))
         display.set_icon(self.__image_load("eco.png"))
@@ -65,9 +65,10 @@ class GameManager:
 
         self.diceImages = [self.__image_load(f"Dice{j+1}.png") for j in range(6)]
         self.diceBarrier = self.__image_load("DiceBarrier.png")
-        self.diceBoard = [(22 * 25 * 756 / 800, 18 * 25 * 750 / 800 + 5), 
-                          (19 * 25 * 756 / 800 + 12, 18 * 25 * 750 / 800 + 5), 
-                          (24 * 25 * 756 / 800 + 13, 18 * 25 * 750 / 800 + 5)]
+        dice_x = self.screen.get_width() // 2 - 50  # 居中偏左约50像素
+        dice_y = self.screen.get_height() - 220     # 离底部200像素
+
+        self.diceBoard = [(dice_x, dice_y)]
         self.diceLocation = [self.diceBoard[0]]
         self.diceSteps = (0, 0, True)
 
@@ -341,6 +342,8 @@ class GameManager:
         for j in range(len(NPC_messages[1])):
             self.screen.blit(self.font.render(NPC_messages[1][j], True, [0, 0, 255]),
                             (self.NPCBoard[1][0], self.NPCBoard[1][1] + j * 25 * 750 / 800))
+        
+
 
     def turn_change(self):
         if self.playerTurn == PlayerTurn.PCMove:
@@ -407,9 +410,9 @@ class GameManager:
         from Player.NPC import NPC
         from LandManage import Landmasses
         from ShootDice import ShootDice
-        self.hero = PC("EcoWorker")
+        self.hero = PC("Eco")
         self.hero.game_manager = self
-        self.enemy = NPC("IndustryRep")
+        self.enemy = NPC("In")
         self.enemy.game_manager = self
         self.landmasses = Landmasses(self.hero.name, self.enemy.name)
         self.shootDice = ShootDice()
