@@ -15,7 +15,7 @@ class GameManager:
         self.font = font.Font(self.source + "simhei.ttf", 17)
         # 调整窗口大小，保持棋盘比例 7562/7506 ≈ 1.0076
         self.screen = display.set_mode((756, 750))
-        display.set_icon(self.__image_load("Dog.ico"))
+        display.set_icon(self.__image_load("eco.png"))
         display.set_caption("环保作物种植")
         self.music = mixer.music.load(self.source + "BackgroundMusic.mp3")
         self.backgroundMusic = MusicPlay(self.music)
@@ -33,7 +33,8 @@ class GameManager:
         self.start = self.__image_load("Start.png")
         self.gameFail = self.__image_load("GameFail.png")
         self.gameWin = self.__image_load("GameWin.png")
-        self.gameMap = self.__image_load("EcoMap.png")
+        self.initialMap = self.__image_load("EcoMap.png")
+        self.gameMap = self.__image_load("gameMap.png")
         self.tips = self.__image_load("Tips.png")
         self.musicOn = self.__image_load("MusicOn.png")
         self.musicOff = self.__image_load("MusicOff.png")
@@ -49,8 +50,8 @@ class GameManager:
         self.PCFixImage = self.__image_load("PCFix.png", scale_to=(74, 72))
         # 原始棋盘中 PC 区域
         self.PCBoard = [
-            (1169 / 7562 * self.screen.get_width(), 2753 / 7506 * self.screen.get_height()),
-            (1169 / 7562 * self.screen.get_width(), 4407 / 7506 * self.screen.get_height())
+            (1169 / 7562 * self.screen.get_width() + 10, 2753 / 7506 * self.screen.get_height() + 50),
+            (1169 / 7562 * self.screen.get_width() + 10, 4407 / 7506 * self.screen.get_height() + 50)
         ]
         
         self.NPCName = "NPC"
@@ -58,8 +59,8 @@ class GameManager:
         self.NPCFixImage = self.__image_load("NPCFix.png", scale_to=(74, 72))
         # NPC 是对称位置
         self.NPCBoard = [
-            ((7562 - 3567) / 7562 * self.screen.get_width(), 2753 / 7506 * self.screen.get_height()),
-            ((7562 - 3567) / 7562 * self.screen.get_width(), 4407 / 7506 * self.screen.get_height())
+            ((7562 - 3567) / 7562 * self.screen.get_width(), 2753 / 7506 * self.screen.get_height() + 50),
+            ((7562 - 3567) / 7562 * self.screen.get_width(), 4407 / 7506 * self.screen.get_height() + 50)
         ]
 
         self.diceImages = [self.__image_load(f"Dice{j+1}.png") for j in range(6)]
@@ -138,7 +139,7 @@ class GameManager:
     def __image_load(self, name, scale_to=None):
         try:
             img = image.load(self.source + name).convert_alpha()
-            if name == "EcoMap.png":
+            if name in ["EcoMap.png", "gameMap.png"]:
                 img = pygame.transform.scale(img, (756, 750))
             elif scale_to:
                 img = pygame.transform.scale(img, scale_to)
@@ -152,10 +153,10 @@ class GameManager:
     def draw_beginning(self):
         for j in range(150):
             self.clock.tick(300)
-            self.screen.blit(self.gameMap, (0, 0))
-            self.screen.blit(self.PCFixImage, (6 * 25 * 756 / 800 + 13 + j * 1 - 10, 6 * 25 * 750 / 800 + 13 - 10))
-            self.screen.blit(self.NPCFixImage, (38 * 25 * 756 / 800 + 13 - j * 1 - 10, 6 * 25 * 750 / 800 + 13 - 10))
-            self.screen.blit(self.start, (175 * 756 / 800, 325 * 750 / 800))
+            self.screen.blit(self.initialMap, (0, 0))
+            # self.screen.blit(self.PCFixImage, (6 * 25 * 756 / 800 + 13 + j * 1 - 10, 6 * 25 * 750 / 800 + 13 - 10))
+            # self.screen.blit(self.NPCFixImage, (38 * 25 * 756 / 800 + 13 - j * 1 - 10, 6 * 25 * 750 / 800 + 13 - 10))
+            # self.screen.blit(self.start, (175 * 756 / 800, 325 * 750 / 800))
             self.screen.blit(self.musicImage, self.musicButtonLocation)
             display.update()
 
@@ -212,26 +213,24 @@ class GameManager:
         else:
             self.screen.blit(self.PCImage, self.__location_convert(PC_pos))
             self.screen.blit(self.NPCImage, self.__location_convert(NPC_pos))
-        self.screen.blit(self.PCFixImage, (116.9, 275.3))
-        self.screen.blit(self.NPCFixImage, (395.5, 275.3))
+        self.screen.blit(self.PCFixImage, (116.9, 235.3))
+        self.screen.blit(self.NPCFixImage, (395.5, 235.3))
 
     def draw_active_status(self):
-        scale_x, scale_y = 756 / 7562, 750 / 7506
+        # 不需要 scale 了，因为坐标都已经用 screen.get_width() 缩放过
+        offset_x = -20  # active 图标左移 30 像素，紧贴信息框左边
+        offset_y = -10    # 可调垂直微调
+
         if self.playerTurn in [PlayerTurn.PCMove, PlayerTurn.PCAct]:
-            self.screen.blit(self.activeOn, (4 * 25 * scale_x, 4 * 25 * scale_y))
-            self.screen.blit(self.activeOn, (4 * 25 * scale_x, 8 * 25 * scale_y))
-            self.screen.blit(self.activeOff, (26 * 25 * scale_x, 4 * 25 * scale_y))
-            self.screen.blit(self.activeOff, (26 * 25 * scale_x, 8 * 25 * scale_y))
+            self.screen.blit(self.activeOn, (self.PCBoard[0][0] + offset_x, self.PCBoard[0][1] + offset_y))
+            self.screen.blit(self.activeOff, (self.NPCBoard[0][0] + offset_x, self.NPCBoard[0][1] + offset_y))
         elif self.playerTurn in [PlayerTurn.NPCMove, PlayerTurn.NPCAct]:
-            self.screen.blit(self.activeOff, (4 * 25 * scale_x, 4 * 25 * scale_y))
-            self.screen.blit(self.activeOff, (4 * 25 * scale_x, 8 * 25 * scale_y))
-            self.screen.blit(self.activeOn, (26 * 25 * scale_x, 4 * 25 * scale_y))
-            self.screen.blit(self.activeOn, (26 * 25 * scale_x, 8 * 25 * scale_y))
+            self.screen.blit(self.activeOff, (self.PCBoard[0][0] + offset_x, self.PCBoard[0][1] + offset_y))
+            self.screen.blit(self.activeOn, (self.NPCBoard[0][0] + offset_x, self.NPCBoard[0][1] + offset_y))
         else:
-            self.screen.blit(self.activeOff, (4 * 25 * scale_x, 4 * 25 * scale_y))
-            self.screen.blit(self.activeOff, (4 * 25 * scale_x, 8 * 25 * scale_y))
-            self.screen.blit(self.activeOff, (26 * 25 * scale_x, 4 * 25 * scale_y))
-            self.screen.blit(self.activeOff, (26 * 25 * scale_x, 8 * 25 * scale_y))
+            self.screen.blit(self.activeOff, (self.PCBoard[0][0] + offset_x, self.PCBoard[0][1] + offset_y))
+            self.screen.blit(self.activeOff, (self.NPCBoard[0][0] + offset_x, self.NPCBoard[0][1] + offset_y))
+
 
     def draw_lands(self, all_lands):
         for land in all_lands:

@@ -38,8 +38,6 @@ def trigger_event_card(player, landmasses):
     ]
     name, func = random.choice(effects)
     print(f"触发事件卡：{name}")
-    game_manager = GameManager()
-    game_manager.draw_card_message(name)
     func()
     return name
 
@@ -65,8 +63,6 @@ def trigger_opportunity_card(player, landmasses):
     else:
         name, func = random.choice([(name, func) for name, func, prob in options if prob == 0])
     print(f"触发机会卡：{name}")
-    game_manager = GameManager()
-    game_manager.draw_card_message(name)
     func()
     return name
 
