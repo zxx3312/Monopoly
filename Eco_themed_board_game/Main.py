@@ -85,21 +85,23 @@ if __name__ == "__main__":
             gameManager.turn_change()
             gameManager.image_update()
 
-        if gameManager.gameStatus == GameStatus.playing:
-            print(f"Current turn: {gameManager.playerTurn}")
+        # if gameManager.gameStatus == GameStatus.playing:
+        #     print(f"Current turn: {gameManager.playerTurn}")
 
         if gameManager.gameStatus == GameStatus.over:
             gameManager.draw_game_over(hero.carbon, enemy.carbon)
 
         
-        if gameManager.playerTurn == PlayerTurn.PCMove:
-            if hero.skip_turn:
-                hero.skip_turn = False
-                gameManager.turn_change()
-                continue
+        # if gameManager.playerTurn == PlayerTurn.PCMove:
+        #     print("PCmove")
+        #     if hero.skip_turn:
+        #         hero.skip_turn = False
+        #         gameManager.turn_change()
+        #         continue
 
-        if gameManager.playerTurn == PlayerTurn.NPCMove:
-            if enemy.skip_turn:
-                enemy.skip_turn = False
-                gameManager.turn_change()
-                continue
+        # if gameManager.playerTurn == PlayerTurn.NPCMove:
+        #     print("NPCmove")
+        #     if enemy.skip_turn:
+        #         enemy.skip_turn = False
+        #         gameManager.turn_change()
+        #         continue

@@ -368,8 +368,10 @@ class GameManager:
 
     def turn_change(self):
         if self.playerTurn == PlayerTurn.PCMove:
+            print("PC Move")
             self.playerTurn = PlayerTurn.PCAct
         elif self.playerTurn == PlayerTurn.NPCMove:
+            print("NPC Move")
             self.playerTurn = PlayerTurn.NPCAct
 
     def turn_change_space(self):
@@ -440,6 +442,7 @@ class GameManager:
         self.get_character_name(self.hero.name, self.enemy.name)
 
     async def __play_game(self):
+        from CardEffect import trigger_event_card, trigger_opportunity_card
         self.clock.tick(10)
         self.hero.update(self.landmasses)
         self.enemy.update(self.landmasses)
@@ -450,27 +453,46 @@ class GameManager:
         self.draw_messages((self.hero.messages(self.landmasses), self.enemy.messages(self.landmasses)))
         self.draw_fix_dice(self.shootDice.finalPoints)
         self.draw_music_button()
-        self.game_over_check(self.hero.carbon, self.enemy.carbon, self.hero.gold, self.enemy.gold)
         self.draw_tips()
+        self.game_over_check(self.hero.carbon, self.enemy.carbon, self.hero.gold, self.enemy.gold)
 
         if self.playerTurn == PlayerTurn.PCMove:
+            print("PCMove")  # 调试输出
             if self.hero.skip_turn:
+                print("PC skip turn, moving to PCAct")
                 self.hero.skip_turn = False
                 self.dice_animation_done = False
-                self.turn_change()
-                return
-            self.diceSteps = self.hero.move()
-            self.shootDice.set_dice(self.diceSteps)
-            await self.draw_dice(self.shootDice.finalPoints, self.shootDice.randomSeries)
-            if self.dice_animation_done:
-                self.hero.position = (self.hero.position + self.diceSteps[0]) % 44
-                effect = self.hero.incidents(self.landmasses)
-                if effect == "trade" and self.hero.chance:
-                    self.hero.gold, self.enemy.gold = self.enemy.gold, self.hero.gold
-                    self.hero.chance = False
-                self.dice_animation_done = False
+                self.turn_change()  # 跳到 PCAct
+            else:
+                self.diceSteps = self.hero.move()
+                self.shootDice.set_dice(self.diceSteps)
+                await self.draw_dice(self.shootDice.finalPoints, self.shootDice.randomSeries)
+                if self.dice_animation_done:
+                    self.hero.position = (self.hero.position + self.diceSteps[0]) % 44
+                    effect = self.hero.incidents(self.landmasses)
+                    if effect == "card":
+                        card_name, card_description = trigger_event_card(self.hero, self.landmasses)
+                        await self.draw_card_message(card_name, card_description)
+                        self.hero.latest_card = f"卡片: {card_name}|{card_description}"
+                        # 假设某些事件卡设置 skip_turn
+                        if "跳过一回合" in card_description:
+                            self.hero.skip_turn = True
+                    elif effect == "trade" and self.hero.chance:
+                        self.hero.gold, self.enemy.gold = self.enemy.gold, self.hero.gold
+                        self.hero.chance = False
+                    elif effect == "trade":
+                        card_name, card_description = trigger_opportunity_card(self.hero, self.landmasses)
+                        await self.draw_card_message(card_name, card_description)
+                        self.hero.latest_card = f"卡片: {card_name}|{card_description}"
+                        if "跳过一回合" in card_description:
+                            self.hero.skip_turn = True
+                    elif effect == "pollution":
+                        self.hero.skip_turn = True  # 监狱或污染事件设置下一回合跳过
+                    self.dice_animation_done = False
+                    self.turn_change()  # 移动完成后跳到 PCAct
 
         elif self.playerTurn == PlayerTurn.PCAct:
+            print("PCAct")  # 调试输出
             land = self.landmasses.lands[self.hero.position]
             if self.PCActKey[0] == K_b:
                 self.hero.buy(land, self.landmasses.is_full(self.hero.name))
@@ -481,29 +503,55 @@ class GameManager:
             elif self.PCActKey[3] == K_f:
                 self.hero.build_factory(land)
             self.PCActKey = [0, 0, 0, 0]
+            # 等待玩家按空格键触发 turn_change_space 到 NPCMove
 
         elif self.playerTurn == PlayerTurn.NPCMove:
+            print("NPCMove")  # 调试输出
             if self.enemy.skip_turn:
+                print("NPC skip turn, moving to NPCAct")
                 self.enemy.skip_turn = False
                 self.dice_animation_done = False
-                self.turn_change()
-                return
-            self.diceSteps = self.enemy.move()
-            self.shootDice.set_dice(self.diceSteps)
-            await self.draw_dice(self.shootDice.finalPoints, self.shootDice.randomSeries)
-            if self.dice_animation_done:
-                self.enemy.position = (self.enemy.position + self.diceSteps[0]) % 44
-                effect = self.enemy.incidents(self.landmasses)
-                if effect == "trade" and self.enemy.chance:
-                    self.hero.gold, self.enemy.gold = self.enemy.gold, self.hero.gold
-                    self.enemy.chance = False
-                self.dice_animation_done = False
+                self.turn_change()  # 跳到 NPCAct
+            else:
+                self.diceSteps = self.enemy.move()
+                self.shootDice.set_dice(self.diceSteps)
+                await self.draw_dice(self.shootDice.finalPoints, self.shootDice.randomSeries)
+                if self.dice_animation_done:
+                    self.enemy.position = (self.enemy.position + self.diceSteps[0]) % 44
+                    effect = self.enemy.incidents(self.landmasses)
+                    if effect == "card":
+                        card_name, card_description = trigger_event_card(self.enemy, self.landmasses)
+                        await self.draw_card_message(card_name, card_description)
+                        self.enemy.latest_card = f"卡片: {card_name}|{card_description}"
+                        if "跳过一回合" in card_description:
+                            self.enemy.skip_turn = True
+                    elif effect == "trade" and self.enemy.chance:
+                        self.hero.gold, self.enemy.gold = self.enemy.gold, self.hero.gold
+                        self.enemy.chance = False
+                    elif effect == "trade":
+                        card_name, card_description = trigger_opportunity_card(self.enemy, self.landmasses)
+                        await self.draw_card_message(card_name, card_description)
+                        self.enemy.latest_card = f"卡片: {card_name}|{card_description}"
+                        if "跳过一回合" in card_description:
+                            self.enemy.skip_turn = True
+                    elif effect == "pollution":
+                        self.enemy.skip_turn = True  # 监狱或污染事件设置下一回合跳过
+                    self.dice_animation_done = False
+                    self.turn_change()  # 移动完成后跳到 NPCAct
 
         elif self.playerTurn == PlayerTurn.NPCAct:
+            print("NPCAct")  # 调试输出
             self.enemy.act(self.landmasses)
-            self.post_space_key_down()
+            self.post_space_key_down()  # 自动触发空格键到 PCMove
 
-        self.turn_change()
+        self.draw_map()
+        self.draw_lands(self.landmasses.lands)
+        self.draw_character(self.hero.position, self.enemy.position)
+        self.draw_active_status()
+        self.draw_messages((self.hero.messages(self.landmasses), self.enemy.messages(self.landmasses)))
+        self.draw_fix_dice(self.shootDice.finalPoints)
+        self.draw_music_button()
+        self.draw_tips()
         self.image_update()
 
     async def draw_card_message(self, card_name):
