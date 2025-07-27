@@ -63,7 +63,7 @@ class GameManager:
             ((7562 - 3567) / 7562 * self.screen.get_width(), 4407 / 7506 * self.screen.get_height() + 50)
         ]
 
-        self.diceImages = [self.__image_load(f"Dice{j+1}.png") for j in range(6)]
+        self.diceImages = [self.__image_load(f"Dice{j+1}.png", scale_to=(50, 50)) for j in range(6)]
         self.diceBarrier = self.__image_load("DiceBarrier.png")
         dice_x = self.screen.get_width() // 2 - 50  # 居中偏左约50像素
         dice_y = self.screen.get_height() - 220     # 离底部200像素
@@ -140,7 +140,7 @@ class GameManager:
     def __image_load(self, name, scale_to=None):
         try:
             img = image.load(self.source + name).convert_alpha()
-            if name in ["EcoMap.png", "gameMap.png"]:
+            if name in ["EcoMap.png", "gameMap.png", "GameWin.png", "GameFail.png"]:
                 img = pygame.transform.scale(img, (756, 750))
             elif scale_to:
                 img = pygame.transform.scale(img, scale_to)
@@ -194,7 +194,7 @@ class GameManager:
             return x * scale_x, y * scale_y
         elif position < 33:
             # 底部：22-33，x 从 6458 到 102（逆序），y 固定 6451
-            x = 6458 - (position - 22 - 1) * (6458 - 1028) / 10
+            x = 6458 - (position - 22) * (6458 - 1028) / 10
             y = 6451
             return x * scale_x, y * scale_y
         elif position == 33:
@@ -204,7 +204,7 @@ class GameManager:
         else:
             # 左边：33-44（回到0），x 固定 102，y 从 6451 到 109（逆序）
             x = 102
-            y = 6451 - (position - 33 - 1) * (6451 - 1013) / 10
+            y = 6451 - (position - 33) * (6451 - 1013) / 10
             return x * scale_x, y * scale_y
 
     def draw_character(self, PC_pos, NPC_pos):
@@ -248,11 +248,12 @@ class GameManager:
                 self.screen.blit(self.wasteland, pos)
 
     def draw_tips(self):
-        if self.gameStatus != GameStatus.over:
-            scale_x, scale_y = 756 / 7562, 750 / 7506
-            self.screen.blit(self.tips, (3 * 25 * scale_x, 27 * 25 * scale_y))
-            tip = self.font.render(random.choice(self.tips_texts), True, (0, 255, 0))
-            self.screen.blit(tip, (3 * 25 * scale_x, 27 * 25 * scale_y + 50))
+        # if self.gameStatus != GameStatus.over:
+        #     scale_x, scale_y = 756 / 7562, 750 / 7506
+        #     self.screen.blit(self.tips, (3 * 25 * scale_x, 27 * 25 * scale_y))
+        #     tip = self.font.render(random.choice(self.tips_texts), True, (0, 255, 0))
+        #     self.screen.blit(tip, (3 * 25 * scale_x, 27 * 25 * scale_y + 50))
+        pass
 
     def __developer_pattern_check(self):
         return self.cheat[0] * self.cheat[1] * self.cheat[2] == 1
@@ -330,18 +331,38 @@ class GameManager:
             for k in range(len(PC_messages[0][j])):
                 self.screen.blit(self.font.render(PC_messages[0][j][k], True, [0, 0, 0]),
                                 (self.PCBoard[0][0] + k * 25 * 6 * 756 / 800, self.PCBoard[0][1] + j * 25 * 750 / 800))
-        for j in range(len(PC_messages[1])):
-            self.screen.blit(self.font.render(PC_messages[1][j], True, [0, 0, 255]),
-                            (self.PCBoard[1][0], self.PCBoard[1][1] + j * 25 * 750 / 800))
+        # 蓝色的附加信息，加入手动换行
+        max_chars_per_line = 15  # 每行最多10个中文字符
+        blue_base_y = self.PCBoard[1][1] - 70
+        blue_x = self.PCBoard[1][0]
+        line_height = 25
+
+        line_idx = 0
+        for msg in PC_messages[1]:
+            for i in range(0, len(msg), max_chars_per_line):
+                subline = msg[i:i + max_chars_per_line]
+                self.screen.blit(self.font.render(subline, True, [0, 0, 255]),
+                                (blue_x, blue_base_y + line_idx * line_height))
+                line_idx += 1
 
         NPC_messages = messages[1]
         for j in range(len(NPC_messages[0])):
             for k in range(len(NPC_messages[0][j])):
                 self.screen.blit(self.font.render(NPC_messages[0][j][k], True, [0, 0, 0]),
                                 (self.NPCBoard[0][0] + k * 25 * 6 * 756 / 800, self.NPCBoard[0][1] + j * 25 * 750 / 800))
-        for j in range(len(NPC_messages[1])):
-            self.screen.blit(self.font.render(NPC_messages[1][j], True, [0, 0, 255]),
-                            (self.NPCBoard[1][0], self.NPCBoard[1][1] + j * 25 * 750 / 800))
+        # 蓝色的附加信息，加入手动换行
+        max_chars_per_line = 15  # 每行最多10个中文字符
+        blue_base_y = self.NPCBoard[1][1] -70
+        blue_x = self.NPCBoard[1][0]
+        line_height = 25
+
+        line_idx = 0
+        for msg in NPC_messages[1]:
+            for i in range(0, len(msg), max_chars_per_line):
+                subline = msg[i:i + max_chars_per_line]
+                self.screen.blit(self.font.render(subline, True, [0, 0, 255]),
+                                (blue_x, blue_base_y + line_idx * line_height))
+                line_idx += 1
         
 
 

@@ -85,8 +85,8 @@ if __name__ == "__main__":
             gameManager.turn_change()
             gameManager.image_update()
 
-        # if gameManager.gameStatus == GameStatus.playing:
-            # print(f"Current turn: {gameManager.playerTurn}")
+        if gameManager.gameStatus == GameStatus.playing:
+            print(f"Current turn: {gameManager.playerTurn}")
 
         if gameManager.gameStatus == GameStatus.over:
             gameManager.draw_game_over(hero.carbon, enemy.carbon)

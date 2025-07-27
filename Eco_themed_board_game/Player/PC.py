@@ -53,8 +53,8 @@ class PC(Player):
         return False
 
     def use_item(self, landmasses, target=None):
-        if self.item in ["瑞雪兆丰年", "好雨知时节", "植树节活动", "环保补贴", "绿色能源发现", "环保志愿者", "生态保护区", "阳光充沛", "环保技术创新", "绿色投资回报", "自然保护区成立", "生态奖励"]:
-            trigger_event_card(self, landmasses)
+        if self.item in ["瑞雪兆丰年", "好雨知时节", "植树节活动", "环保补贴", "绿色能源发现", "环保志愿者", "生态保护区", "阳光充沛", "环保技术创新", "绿色投资回报", "自然保护区成立", "生态奖励", "生态交换卡", "土地规划卡", "环保专家", "市场波动卡", "土地置换卡", "环保挑战卡", "市场调控卡", "生态修复卡", "资源交易卡",]:
+            self.item, self.item_description = trigger_event_card(self, landmasses)
         elif self.item == "酸雨来袭":
             for land in landmasses.lands:
                 if land.owner == self.name and land.plant_type is not None and land.protected_turns == 0:
@@ -113,10 +113,10 @@ class PC(Player):
     def incidents(self, all_lands):
         land = all_lands.lands[self.position]
         if land.owner == "事件":
-            self.item = trigger_event_card(self, all_lands)
+            self.item, self.item_description = trigger_event_card(self, all_lands)
             return f"事件卡: {self.item}"
         elif land.owner == "机会":
-            self.item = trigger_opportunity_card(self, all_lands)
+            self.item, self.item_description = trigger_opportunity_card(self, all_lands)
             return f"机会卡: {self.item}"
         elif land.owner == "监狱":
             self.skip_turn = True
@@ -159,11 +159,15 @@ class PC(Player):
                 messages.append("按B键与对手交换金币")
                 self.chance = True
             elif land.incident == Incidents.card:
-                messages.append(f"事件：抽到道具卡 - {self.item}")
+                if self.item and self.item_description:
+                    messages.append(f"事件：抽到道具卡 - {self.item, self.item_description}")
+                # self.item, self.item_description = None, None
         elif land.position == 0:
             messages.append("事件：你到达起点，获得100金币")
         elif land.owner == "机会":
-            messages.append(f"机会卡：{self.item}")
+            if self.item and self.item_description:
+                messages.append(f"机会卡：{self.item, self.item_description}")
+            # self.item, self.item_description = None, None
         elif land.owner == "监狱":
             messages.append("事件：进入监狱，停留1回合")
         elif land.owner == "系统":

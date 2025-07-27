@@ -50,8 +50,8 @@ class NPC(Player):
         return False
 
     def use_item(self, landmasses, target=None):
-        if self.item in ["瑞雪兆丰年", "好雨知时节", "植树节活动", "环保补贴", "绿色能源发现", "环保志愿者", "生态保护区", "阳光充沛", "环保技术创新", "绿色投资回报", "自然保护区成立", "生态奖励"]:
-            trigger_event_card(self, landmasses)
+        if self.item in ["瑞雪兆丰年", "好雨知时节", "植树节活动", "环保补贴", "绿色能源发现", "环保志愿者", "生态保护区", "阳光充沛", "环保技术创新", "绿色投资回报", "自然保护区成立", "生态奖励", "生态交换卡", "土地规划卡", "环保专家", "市场波动卡", "土地置换卡", "环保挑战卡", "市场调控卡", "生态修复卡", "资源交易卡"]:
+            self.item, self.item_description = trigger_event_card(self, landmasses)
         elif self.item == "酸雨来袭":
             for land in landmasses.lands:
                 if land.owner == self.name and land.plant_type is not None and land.protected_turns == 0:
@@ -110,10 +110,10 @@ class NPC(Player):
     def incidents(self, all_lands):
         land = all_lands.lands[self.position]
         if land.owner == "事件":
-            self.item = trigger_event_card(self, all_lands)
+            self.item, self.item_description = trigger_event_card(self, all_lands)
             return f"事件卡: {self.item}"
         elif land.owner == "机会":
-            self.item = trigger_opportunity_card(self, all_lands)
+            self.item, self.item_description = trigger_opportunity_card(self, all_lands)
             return f"机会卡: {self.item}"
         elif land.owner == "监狱":
             self.skip_turn = True
@@ -153,11 +153,13 @@ class NPC(Player):
                 messages.append("事件：对手获得贸易机会")
                 self.chance = True
             elif land.incident == Incidents.card:
-                messages.append(f"事件：对手抽到道具卡 - {self.item}")
+                if self.item and self.item_description:
+                    messages.append(f"事件：对手抽到道具卡 - {self.item, self.item_description}")
         elif land.position == 0:
             messages.append("事件：你到达起点，获得100金币")
         elif land.owner == "机会":
-            messages.append(f"机会卡：{self.item}")
+            if self.item and self.item_description:
+                messages.append(f"机会卡：{self.item, self.item_description}")
         elif land.owner == "监狱":
             messages.append("事件：对手进入监狱，停留1回合")
         elif land.owner == "系统":
@@ -174,15 +176,33 @@ class NPC(Player):
 
     def act(self, landmasses):
         land = landmasses.lands[self.position]
+
+        # 买地：如果是系统地块，尝试购买
+        if land.owner == "系统" and self.gold >= 300:
+            self.buy(land, landmasses.is_full(self.name))
+
+        # 如果是自己拥有的地块
         if land.owner == self.name:
-            if land.plant_type is None and land.factory_level == 0 and self.gold >= int(50 * self.price_modifier) and self.can_plant:
-                self.plant(land, random.randint(0, 4))
-            elif land.plant_type is not None and self.gold >= int(100 * land.plant_level * self.price_modifier) and self.can_upgrade:
+            # 优先升级植物
+            if land.plant_type is not None and land.plant_level < 3:
                 self.upgrade(land)
-            elif land.plant_type is None and land.factory_level == 0 and self.gold >= int(150 * self.price_modifier):
+
+            # 否则尝试种植
+            elif land.plant_type is None and land.factory_level == 0:
+                self.plant(land, random.randint(0, 4))
+
+            # 否则尝试建工厂
+            elif land.plant_type is None and land.factory_level == 0:
                 self.build_factory(land)
+
+        # 使用道具（无论站在哪）
         if self.item:
-            self.use_item(landmasses, land)
+            self.use_item(landmasses, land)  # 传当前格子
+            self.item = None
+            self.item_description = None
+
+        # 特殊处理机会交易
         if land.incident == Incidents.trade and self.chance and self.gold < 1000:
             return "trade"
         return None
+

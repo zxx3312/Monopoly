@@ -14,6 +14,7 @@ class Player:
         self.plants = [0] * 5
         self.factories = [0] * 4
         self.item = None
+        self.item_description = None
         self.chance = False
         self.skip_turn = False
         self.double_income_turn = 0
@@ -48,18 +49,19 @@ class Player:
     def messages(self, all_lands):
         base_messages = self.__base_messages()
         incidents_messages = self.incidents_messages(all_lands)
+        # incidents_messages = self.item_description
         return base_messages, incidents_messages
 
     def __base_messages(self):
         messages = []
-        for j in range(3):
+        for j in range(4):
             messages.append([])
         messages[0].append(f"昵称: {self.name}")
         messages[0].append(f"坐标: {self.position}")
         messages[1].append(f"碳足迹: {self.carbon}")
         messages[1].append(f"金币: {self.gold}")
         messages[2].append(f"肥料: {self.fertilizer}")
-        messages[2].append(f"道具: {self.item or '无'}")
+        messages[3].append(f"道具: {self.item or '无'}")
         return messages
 
     @abstractmethod
