@@ -47,6 +47,12 @@ if __name__ == "__main__":
             gameManager.draw_tips()
 
             if gameManager.playerTurn == PlayerTurn.PCMove:
+                if hero.skip_turn:
+                    print("PC skip turn, moving to PCAct")
+                    hero.skip_turn = False
+                    gameManager.dice_animation_done = False
+                    gameManager.turn_change()  # 跳到 PCAct
+                    continue
                 gameManager.diceSteps = hero.move()
                 hero.position = (hero.position + gameManager.diceSteps[0]) % 44
                 effect = hero.incidents(landmasses)
@@ -69,6 +75,12 @@ if __name__ == "__main__":
                 gameManager.PCActKey = [0, 0, 0, 0]
 
             elif gameManager.playerTurn == PlayerTurn.NPCMove:
+                if enemy.skip_turn:
+                    print("NPC skip turn, moving to PCAct")
+                    enemy.skip_turn = False
+                    gameManager.dice_animation_done = False
+                    gameManager.turn_change()  # 跳到 PCAct
+                    continue
                 gameManager.diceSteps = enemy.move()
                 enemy.position = (enemy.position + gameManager.diceSteps[0]) % 44
                 effect = enemy.incidents(landmasses)
@@ -83,6 +95,7 @@ if __name__ == "__main__":
 
             gameManager.draw_dice(shootDice.finalPoints, shootDice.randomSeries)
             gameManager.turn_change()
+            
             gameManager.image_update()
 
         # if gameManager.gameStatus == GameStatus.playing:

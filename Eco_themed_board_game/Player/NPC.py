@@ -174,35 +174,70 @@ class NPC(Player):
                 messages.append(f"对手碳足迹增加{5 * land.plant_level}")
         return messages
 
+    # def act(self, landmasses):
+    #     land = landmasses.lands[self.position]
+
+    #     # 买地：如果是系统地块，尝试购买
+    #     if land.owner == "系统" and self.gold >= 300:
+    #         self.buy(land, landmasses.is_full(self.name))
+
+    #     # 如果是自己拥有的地块
+    #     if land.owner == self.name:
+    #         # 优先升级植物
+    #         if land.plant_type is not None and land.plant_level < 3:
+    #             self.upgrade(land)
+
+    #         # 否则尝试种植
+    #         elif land.plant_type is None and land.factory_level == 0:
+    #             self.plant(land, random.randint(0, 4))
+
+    #         # 否则尝试建工厂
+    #         elif land.plant_type is None and land.factory_level == 0:
+    #             self.build_factory(land)
+
+    #     # 使用道具（无论站在哪）
+    #     if self.item:
+    #         self.use_item(landmasses, land)  # 传当前格子
+    #         self.item = None
+    #         self.item_description = None
+
+    #     # 特殊处理机会交易
+    #     if land.incident == Incidents.trade and self.chance and self.gold < 1000:
+    #         return "trade"
+    #     return None
+
     def act(self, landmasses):
         land = landmasses.lands[self.position]
 
-        # 买地：如果是系统地块，尝试购买
-        if land.owner == "系统" and self.gold >= 300:
-            self.buy(land, landmasses.is_full(self.name))
+        # 买地（考虑金币、碳足迹、预留资金）
+        if land.owner == "系统":
+            cost = int(200 * self.price_modifier)
+            reserve = 50
+            if self.gold >= cost + reserve:
+                self.buy(land, landmasses.is_full(self.name))
 
-        # 如果是自己拥有的地块
+        # 如果是自己地块
         if land.owner == self.name:
-            # 优先升级植物
+            # 决定升级 / 种植 / 建厂
             if land.plant_type is not None and land.plant_level < 3:
-                self.upgrade(land)
-
-            # 否则尝试种植
+                if self.gold > 200 and (self.carbon < 80 or random.random() < 0.3):
+                    self.upgrade(land)
             elif land.plant_type is None and land.factory_level == 0:
-                self.plant(land, random.randint(0, 4))
+                if self.carbon > 50 or self.gold < 300:
+                    self.plant(land, random.randint(0, 4))
+                elif self.gold > 500 and self.carbon < 40:
+                    self.build_factory(land)
 
-            # 否则尝试建工厂
-            elif land.plant_type is None and land.factory_level == 0:
-                self.build_factory(land)
-
-        # 使用道具（无论站在哪）
+        # 使用道具（按类别选择是否立即使用）
         if self.item:
-            self.use_item(landmasses, land)  # 传当前格子
-            self.item = None
-            self.item_description = None
+            if self.item in ["瑞雪兆丰年", "植树节活动", "环保补贴"]:
+                self.use_item(landmasses, land)
+            elif self.item in ["酸雨来袭", "虫害爆发"]:
+                if any(l.owner != self.name and l.plant_type for l in landmasses.lands):
+                    self.use_item(landmasses, land)
 
         # 特殊处理机会交易
         if land.incident == Incidents.trade and self.chance and self.gold < 1000:
             return "trade"
-        return None
 
+        return None

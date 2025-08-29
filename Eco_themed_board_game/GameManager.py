@@ -368,10 +368,10 @@ class GameManager:
 
     def turn_change(self):
         if self.playerTurn == PlayerTurn.PCMove:
-            print("PC Move")
+            # print("PC Move")
             self.playerTurn = PlayerTurn.PCAct
         elif self.playerTurn == PlayerTurn.NPCMove:
-            print("NPC Move")
+            # print("NPC Move")
             self.playerTurn = PlayerTurn.NPCAct
 
     def turn_change_space(self):
@@ -388,13 +388,13 @@ class GameManager:
 
     def game_over_check(self, PC_carbon, NPC_carbon, PC_gold, NPC_gold):
         if self.gameStatus != GameStatus.end:
-            if PC_gold <= 0:
+            if PC_gold < 0:
                 self.winner = self.NPCName
                 self.gameStatus = GameStatus.over
-            elif NPC_gold <= 0:
+            elif NPC_gold < 0:
                 self.winner = self.PCName
                 self.gameStatus = GameStatus.over
-            elif PC_carbon <= 0 or NPC_carbon <= 0 or PC_carbon > 120 or NPC_carbon > 120 or self.turn_count >= 50:
+            elif PC_carbon < 0 or NPC_carbon < 0 or PC_carbon > 120 or NPC_carbon > 120:
                 if PC_carbon < NPC_carbon:
                     self.winner = self.PCName
                 elif NPC_carbon < PC_carbon:
@@ -408,7 +408,7 @@ class GameManager:
         self.screen.blit(self.diceBarrier, (18 * 25 * 756 / 800, 17 * 25 * 750 / 800))
         text = self.font.render(f"Winner: {self.winner}! Reduced {max(PC_carbon, NPC_carbon)} tons of CO2!", True, (0, 255, 0))
         self.screen.blit(text, (175 * 756 / 800, 325 * 750 / 800))
-        self.screen.blit(self.gameWin if self.winner == self.PCName else self.gameFail, (175 * 756 / 800, 325 * 750 / 800))
+        self.screen.blit(self.gameWin if self.winner == self.PCName else self.gameFail, (0, 0))
         display.update()
 
     def __play_again(self):
@@ -456,8 +456,11 @@ class GameManager:
         self.draw_tips()
         self.game_over_check(self.hero.carbon, self.enemy.carbon, self.hero.gold, self.enemy.gold)
 
+        
+
         if self.playerTurn == PlayerTurn.PCMove:
             print("PCMove")  # 调试输出
+            # print(self.hero.skip_turn)
             if self.hero.skip_turn:
                 print("PC skip turn, moving to PCAct")
                 self.hero.skip_turn = False
@@ -507,6 +510,7 @@ class GameManager:
 
         elif self.playerTurn == PlayerTurn.NPCMove:
             print("NPCMove")  # 调试输出
+            print(self.hero.skip_turn)
             if self.enemy.skip_turn:
                 print("NPC skip turn, moving to NPCAct")
                 self.enemy.skip_turn = False

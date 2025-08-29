@@ -61,7 +61,7 @@ class Player:
         messages[1].append(f"碳足迹: {self.carbon}")
         messages[1].append(f"金币: {self.gold}")
         messages[2].append(f"肥料: {self.fertilizer}")
-        messages[3].append(f"道具: {self.item or '无'}")
+        # messages[3].append(f"道具: {self.item or '无'}")
         return messages
 
     @abstractmethod
